@@ -145,70 +145,63 @@ sync_local_target() {
         fi
         args_parent=(-p "${path_source_snapshot}")
     done
-
 }
 
 sync_remote_target() {
     log "Syncing source ${path_source} to remote target ${target} at ${remote}..."
-    log "Remote syncing not implemented yet, skipping"
-    # for target in "${targets[@]}"; do
-    #     echo "Syncing ${path_source} to ${target}..."
-    #     if [[ "${target::1}" == '/' ]]; then
-    #         if [[ ! -d "${target}" ]]; then
-    #             echo "Skipping non-existing target ${target}"
-    #             continue
-    #         fi
-    #         echo "Syncing locally to ${target}"
-    #         args_parent=()
+    args_remote=(ssh -o ConnectTimeout=5 -o ConnectionAttempts=1 "${remote}" --)
+    if ! "${args_remote[@]}" "test -d '${target}'"; then
+        echo "Skipped non-existing remote target ${target} at ${remote} or a bad remote"
+        continue
+    fi
+    local \
+        args_parent=() \
+        date_snapshot \
+        should_sync \
+        name_snapshot \
+        path_{source,target}_{container,snapshot,info} \
+        uuid_received \
+        wrapper_remote="${wrappers_remote[${remote}]}"
 
-    #     else
-    #         remote="${target%%:*}"
-    #         args_remote=(ssh -o ConnectTimeout=5 "${remote}" --)
-    #         if ! "${args_remote[@]}" true; then
-    #             echo "Skipped unreachable remote ${remote}"
-    #             continue
-    #         fi
-    #         target="${target#*:}"
-    #         if ! "${args_remote[@]}" "test -d '${target}'"; then
-    #             echo "Skipped non-existing remote target ${target} at ${remote}"
-    #             continue
-    #         fi
-    #         echo "Syncing remotely to ${target} at ${remote}..."
-    #         args_parent=()
-    #         for date_snapshot in "${dates_snapshot[@]}"; do
-    #             should_sync='y'
-    #             name_snapshot="${names_snapshot["${date_snapshot}"]}"
-    #             path_target="${target}/${name_snapshot}"
-    #             path_source="${paths_source["${date_snapshot}"]}"
-    #             echo "Checking if we need to sync ${path_source} to ${path_target} at ${remote}..."
-    #             if "${args_remote[@]}" "test -d '${path_target}'"; then
-    #                 if "${args_remote[@]}" "test -d '${path_target}/snapshot'" ; then
-    #                     uuid_target=$("${args_remote[@]}" "btrfs subvolume show '${path_target}/snapshot'" | awk '/Received UUID/{print $3}')
-    #                     if [[ "${#uuid_target}" == 36 ]]; then
-    #                         if ! "${args_remote[@]}" "test -f '${path_target}/info.xml'" ]]; then
-    #                             "${args_remote[@]}" "tee '${path_target}/info.xml'" < "${path_source}/info.xml" > /dev/null
-    #                         fi
-    #                         echo "Skipping already synced snapshot ${path_target} at ${remote}"
-    #                         should_sync=''
-    #                     else
-    #                         echo "A previous sync to ${path_target} was failed, deleting it..."
-    #                         "${args_remote[@]}" btrfs subvolume delete "${path_target}/snapshot"
-    #                         "${args_remote[@]}" rm -f "${path_target}/info.xml"
-    #                     fi
-    #                 fi
-    #             else
-    #                 mkdir "${path_target}"
-    #             fi
-    #             if [[ "${should_sync}" ]]; then
-    #                 echo "Syncing ${path_source} to ${path_target} (args parent: ${args_parent[*]})..."
-    #                 btrfs send "${args_parent[@]}" "${path_source}/snapshot" | "${args_remote[@]}" btrfs receive "${path_target}"
-    #                 "${args_remote[@]}" "tee '${path_target}/info.xml'" < "${path_source}/info.xml" > /dev/null
-    #             fi
-    #             args_parent=(-p "${path_source}/snapshot")
-    #         done
-
-    #     fi
-    # done
+    for date_snapshot in "${dates_snapshot[@]}"; do
+        should_sync='y'
+        name_snapshot="${names_snapshot["${date_snapshot}"]}"
+        path_target_container="${target}/${name_snapshot}"
+        path_target_snapshot="${path_target_container}/snapshot"
+        path_target_info="${path_target_container}/info.xml"
+        path_source_container="${paths_source_container["${date_snapshot}"]}"
+        path_source_snapshot="${path_source_container}/snapshot"
+        path_source_info="${path_source_container}/info.xml"
+        log "Checking if it is needed to sync ${path_source_container} to ${path_target_container}..."
+        if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_container}'"; then
+            if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_snapshot}'"; then
+                uuid_received=$("${args_remote[@]}" "${wrapper_remote} btrfs subvolume show '${path_target_snapshot}'" | awk '/Received UUID/{print $3}')
+                if [[ "${#uuid_received}" == 36 ]]; then
+                    if [[ ! -f "${path_target_info}" ]]; then
+                        "${wrapper_local}" cat "${path_source_info}" | 
+                            "${args_remote[@]}" "${wrapper_remote} tee '${path_target_info}'" \
+                            > /dev/null
+                    fi
+                    log "Skipping already synced snapshot ${path_target_container}"
+                    should_sync=''
+                else
+                    log "A previous sync to ${path_target_container} was failed, deleting it..."
+                    "${args_remote[@]}" "${wrapper_remote} btrfs subvolume delete '${path_target_snapshot}'"
+                    "${args_remote[@]}" "${wrapper_remote} rm -f '${path_target_info}'"
+                fi
+            fi
+        else
+            "${args_remote[@]}" "${wrapper_remote} mkdir '${path_target_container}'"
+        fi
+        if [[ "${should_sync}" ]]; then
+            log "Syncing ${path_source} to ${path_target_container} at ${remote} (args parent: ${args_parent[*]})..."
+            "${wrapper_local}" btrfs send "${args_parent[@]}" "${path_source_snapshot}" | "${args_remote[@]}" "${wrapper_local} btrfs receive '${path_target_container}'"
+            "${wrapper_local}" cat "${path_source_info}" | 
+                "${args_remote[@]}" "${wrapper_remote} tee '${path_target_info}'" \
+                > /dev/null
+        fi
+        args_parent=(-p "${path_source_snapshot}")
+    done
 }
 
 sync_target() {
@@ -342,13 +335,16 @@ cli() {
             shift
             ;;
         '--help')
-            echo 'snasyncer --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target]))'
+            echo 'snasyncer --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) ...'
             echo
-            printf '  --%-20s%s\n' \
-                'source [source]' 'either the mountpoint containing .snapshots mountpoint, or .snapshots mountpoint itself, this begins the declaration of a single syncing operation, multiple [source] could be defined, e.g. "/.snapshots", "/home"' \
-                'prefix [prefix]' 'the sycned subvols prefix, by default this is [source] with all path-seperators swapped to _ and then all leading _ removed, e.g. for source "/home" the default would be _home' \
-                'target [target]' 'either absolute path starting with / to put snapshots in, or a scp-style remote prefix to remotely send snapshots to, e.g. "/srv/backup/warm/snapshots", "nas.lan:/srv/snapshots", etc' \
-                'wrapper [wrapper]' 'a "wrapper" for local permission-sensitive operations, by default this is sudo, it could also be a script'
+            printf '  --%-37s%s\n' \
+                'source [source]' 'either the mountpoint containing .snapshots mountpoint, or .snapshots mountpoint itself, this begins the declaration of a single syncing operation, multiple [source] could be defined and each needs their corresponding [target]s (see below), e.g. "/.snapshots", "/home"' \
+                'prefix [prefix]' 'the sycned subvols prefix for the current source, by default this is [source] with all path-seperators swapped to _ and then all leading _ removed, e.g. for source "/home" the default would be _home' \
+                'target [target]' 'either absolute path starting with / to put snapshots in, or a scp-style remote prefix to remotely send snapshots to, for current source, e.g. "/srv/backup/warm/snapshots", "nas.lan:/srv/snapshots", etc' \
+                'wrapper-local [wrapper]' 'a "wrapper" for local permission-sensitive operations, default: sudo, it could also be a script' \
+                'wrappper-remote:[remote] [wrapper]' 'a "wrapper" for remote permisison-sensitive operations for the specific remote, default: sudo'
+            echo
+            echo 'Note: if you want to sync multiple sources, it is recommended to do them in a single snasync invocation, e.g. snasync --source / --prefix pc_root --target /srv/backup/warm/snapshots --target nas.lan:/srv/backup/snapshots --source /home --prefix pc_home --target /srv/backup/warm/snapshots --target nas.lan:/srv/backup/snapshots'
             exit
             ;;
         '--wrapper-local')

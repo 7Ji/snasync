@@ -1,13 +1,13 @@
 # Snasync - A **sna**pper snapshots **sync**er
 
-Snasync is a simple and naive Bash script to help you to sync Btrfs snapshots created by [snapper](http://snapper.io/) from hot storage (i.e. the one `.snapshots` resides on) to warm, cold and/or remote storage.
+Snasync is a simple and naive Bash script to help you sync Btrfs snapshots created by [snapper](http://snapper.io/) from hot storage (i.e. the one `.snapshots` resides on) to warm, cold and/or remote storage.
 
-Do note that although it's named "sync", it is mostly a **one-way sync**: the storage layout of subvolumes that was send-and-received are differeent from the source subvolumes, see below for the [In-and-out chapter](#in-and-out)
+Do note that although it's named "sync", it is mostly a **one-way sync** by design: the names of subvolume containers that was send-and-received are different from the source containers, e.g. a source container `/.snapshots/127` could be synced to `/srv/backup/warm/snapshots/mypc-20241223150000`, while the inner `snapshot` and `info.xml` are kept the same nontheless. This is mostly to work around the fact that snapper snapshots could be purged altogether and everything would start from ID 1 again, and you surely shouldn't also purge your cold backups in most case.
 
 ## Usage
 
 ```sh
-snasync --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) (--source [source] (--source [source] (...))) (--wrapper-local [wrapper]) (--wrapper-remote-[remote] [wrapper])
+snasync --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) ...
 ```
 
 The definition of the most-used options are as follows:
@@ -40,7 +40,7 @@ snasync \
 
 Due to the nature of warm/cold/remote backups that they could be unreachable in some cases, missing of `[target]` would only cause it to be skipped, and snasync would continue running until the end.
 
-It is highly recommended to sync multiple `[source]`s and multiple `[target]`s in a single snasync run, so pre- and post- logics would only be run once.
+It is highly recommended to sync multiple `[source]`s and multiple `[target]`s in a single snasync run, so pre- and post- logics would only be run once, and resources like remote SSH tunnels could be re-used efficiently (remember to set up your `ssh_config` to re-use connections, disbale compression, etc, following [Arch Wiki](https://wiki.archlinux.org/title/OpenSSH#Speeding_up_SSH))
 
 ## In-and-out
 The way snasync creates its 
