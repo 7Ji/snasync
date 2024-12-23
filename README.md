@@ -1,33 +1,50 @@
 # Snasync - A **sna**pper snapshots **sync**er
 
-Snasync is a simple and naive Bash script to help you to sync Btrfs snapshots created by [snapper](http://snapper.io/) to cold and remote backups.
+Snasync is a simple and naive Bash script to help you to sync Btrfs snapshots created by [snapper](http://snapper.io/) from hot storage (i.e. the one `.snapshots` resides on) to warm, cold and/or remote storage.
 
-Do note the although it's named "sync", it is mostly a **one-way sync**: the storage layout of subvolumes that was send-and-received are totally differeent from the source subvolumes, see below for the [In-and-out chapter](#in-and-out)
+Do note that although it's named "sync", it is mostly a **one-way sync**: the storage layout of subvolumes that was send-and-received are differeent from the source subvolumes, see below for the [In-and-out chapter](#in-and-out)
 
 ## Usage
 
 ```sh
-snasync --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target]))
+snasync --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) (--source [source] (--source [source] (...))) (--wrapper-local [wrapper]) (--wrapper-remote-[remote] [wrapper])
 ```
 
-- `--source [source]` is either the mountpoint containing .snapshots mountpoint, or .snapshots mountpoint itself, this is always required
-- `--prefix [prefix]` is the sycned subvols prefix, by default this is `[source]` with all path-seperators and dots swapped to _
-- `--target [target]` is either absolute path starting with / to put snapshots in, or a scp-style remote prefix to remotely send snapshots to. Can be specified so multiple targets can be used.
+The definition of the most-used options are as follows:
+
+- `--source [source]` is either the mountpoint containing .snapshots mountpoint, or .snapshots mountpoint itself, this is always required, multiple `source` could be declared and snasync would handle them one by one.
+- `--prefix [prefix]` is the sycned subvols prefix applied to the previous `[source]`, by default this is `[source]` with all path-seperators and dots swapped to _
+- `--target [target]` is either absolute path starting with / to put snapshots in, or a scp-style remote prefix to remotely send snapshots to, applied to the previous `[source]`. Can be specified multiple times so multiple targets can be used.
   - A local path should start with `/`, e.g. `/mnt/backup/snapshots`
   - Anything else is considered a remote path, and it should be in the scp-style, e.g. `root@backup.my.lan:/`
 
-Due to the nature that a cold backup drive would not always be connected, by default a missing `[target]` would not cause snasync to fail. If
+Usually you should not set the following options:
+
+- `--wrapper-local [wrapper]` is the "wrapper" that should be placed before the local permission-sensitive operations, by default it is "sudo", e.g. `--wrapper-local doas`
+- `--wrapper-remote:[remote] [wrapper]` is the "wrapper" that should be placed before the remote permission-sensitive operations, by default it is "sudo", e.g. `--wrapper-remote-nas.lan doas`
+
+A common invocation of snasync is usually like this:
+```sh
+snasync \
+  --source / --prefix pc_root \
+    --target /srv/backup/warm/snapshots \
+    --target nas.lan:/srv/backup/snapshots \
+    --target /mnt/cold-backup/snapshots \
+  --source /home --prefix pc_home \
+    --target /srv/backup/warm/snapshots \
+    --target nas.lan:/srv/backup/snapshots \
+  --source /srv --prefix pc_srv \
+    --target /srv/backup/warm/snapshots \
+    --target /mnt/cold-backup/snapshot
+```
+
+Due to the nature of warm/cold/remote backups that they could be unreachable in some cases, missing of `[target]` would only cause it to be skipped, and snasync would continue running until the end.
+
+It is highly recommended to sync multiple `[source]`s and multiple `[target]`s in a single snasync run, so pre- and post- logics would only be run once.
 
 ## In-and-out
+The way snasync creates its 
 
-Snasync runs independently of the snapper daemon, it just iterates through the to-be-synced snapshots folder and come up with the list to sync, and then sync them up. As such and the fact that a running snapper daemon instance could totally create new / delete old snapshots, it does the syncing in an atomic way:
-
-1. For the given `[source]`, try to get the corresponding `/.snapshots` mountpoint, iterate through there
-2. If there is `.snapshots/.snasync` folder, remove it
-3. Create a `.snapshots/.snasync` folder, this is where all our later operations happen
-4. For each snapshots under `.snapshots`, create a read-only snapshot at `.snapshots/.snasync/[prefix]-[timestamp].snapshot`, in which `[timestamp]` is parsed from the accompanying `info.xml` and it in `[YYYYMMDDHHMMSS]` format, and then copy that info file to `.snapshots/.snasync/[prefix]-[timestamp].info.xml`. As we store our snapshots under our own folders they won't be removed by snapper cleaner while we're at work.
-5. Now snasync has an internal list of all timestamps, sort them up 
-6. For each to-be-synced-to-target, check if there is a `[target]/[prefix]-[timestamp].snapshot` existing, if it exists then do nothing; if it does not exist then create a folder `[target]/[prefix]-[timestamp].snapshot.temp`, and send the snapshots to there. After it's received and the info.xml is copied to there, move both the snapshot and info out. This is so that the received snapshot is atomic: it is either not received, or fully received.
 
 ## License
 **snasync** (snapper snapshots syncer) is licensed under [**GPL3**](https://gnu.org/licenses/gpl.html)
