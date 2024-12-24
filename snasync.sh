@@ -210,6 +210,13 @@ sync_remote_target() {
         fi
         args_parent=(-p "${path_source_snapshot}")
     done
+
+    for name_snapshot in $("${args_remote[@]}" "${wrapper_remote} find '${target}' -maxdepth 1 -mindepth 1 -type d -name '${prefix_snapshot}-*'" | sed -n 's|.*/\('"${prefix_snapshot}"'-[0-9]\{14\}\)$|\1|p'); do
+        if ! grep -q -- "${name_snapshot}" "${path_note_names_snapshot}"; then
+            log "Marking snapshot ${name_snapshot} at ${target} at ${remote} as orphan as its source snapshot was gone"
+            "${args_remote[@]}" "${wrapper_remote} mv '${target}/${name_snapshot}' '${target}/${name_snapshot}.orphan'"
+        fi
+    done
 }
 
 sync_target() {
