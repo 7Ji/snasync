@@ -9,7 +9,7 @@
 # You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>
 
 log() {
-    echo "[snasync] ${FUNCNAME[1]}@${BASH_LINENO[0]}: $*"
+    echo "[snasync #${BASHPID}] ${FUNCNAME[1]}@${BASH_LINENO[0]}: $*"
 }
 
 initialize() {
@@ -264,9 +264,11 @@ sync_source() {
 
     while (( "$i" <= "${source_target_end}" )); do
         target="${targets[$i]}"
-        sync_target
+        sync_target &
         i=$(("$i" + 1))
     done
+
+    wait
 
     rm -f "${path_note_names_snapshot}"
 }
@@ -283,9 +285,11 @@ work() {
         prefix_snapshot="${prefixes_snapshot[$i]}"
         source_target_start="${sources_target_start[$i]}"
         source_target_end="${sources_target_end[$i]}"
-        sync_source
+        sync_source &
         i=$(( "$i" + 1 ))
     done
+
+    wait
 }
 
 init_source() {
