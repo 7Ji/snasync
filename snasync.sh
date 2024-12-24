@@ -139,11 +139,19 @@ sync_local_target() {
             "${wrapper_local}" mkdir "${path_target_container}"
         fi
         if [[ "${should_sync}" ]]; then
-            log "Syncing ${path_source} to ${path_target_container} (args parent: ${args_parent[*]})..."
+            log "Syncing ${path_source_container} to ${path_target_container} (args parent: ${args_parent[*]})..."
             "${wrapper_local}" btrfs send "${args_parent[@]}" "${path_source_snapshot}" | "${wrapper_local}" btrfs receive "${path_target_container}"
             "${wrapper_local}" cp --no-preserve=ownership "${path_source_info}" "${path_target_info}"
         fi
         args_parent=(-p "${path_source_snapshot}")
+        paths_target_container+=("${path_target_container}")
+    done
+
+    for name_snapshot in $("${wrapper_local}" find "${target}" -maxdepth 1 -mindepth 1 -type d -name "${prefix_snapshot}"'-*' | sed -n 's|.*/\('"${prefix_snapshot}"'-[0-9]\{14\}\)$|\1|p'); do
+        if ! grep -q -- "${name_snapshot}" "${path_note_names_snapshot}"; then
+            log "Marking snapshot ${name_snapshot} at ${target} as orphan as its source snapshot was gone"
+            "${wrapper_local}" mv "${target}/${name_snapshot}"{,.orphan}
+        fi
     done
 }
 
@@ -194,7 +202,7 @@ sync_remote_target() {
             "${args_remote[@]}" "${wrapper_remote} mkdir '${path_target_container}'"
         fi
         if [[ "${should_sync}" ]]; then
-            log "Syncing ${path_source} to ${path_target_container} at ${remote} (args parent: ${args_parent[*]})..."
+            log "Syncing ${path_source_container} to ${path_target_container} at ${remote} (args parent: ${args_parent[*]})..."
             "${wrapper_local}" btrfs send "${args_parent[@]}" "${path_source_snapshot}" | "${args_remote[@]}" "${wrapper_local} btrfs receive '${path_target_container}'"
             "${wrapper_local}" cat "${path_source_info}" | 
                 "${args_remote[@]}" "${wrapper_remote} tee '${path_target_info}'" \
@@ -238,6 +246,11 @@ sync_source() {
 
     dates_snapshot=($(printf '%s\n' "${dates_snapshot[@]}" | sort))
 
+    local path_note_names_snapshot=$(mktemp)
+    for date_snapshot in "${dates_snapshot[@]}"; do
+        echo "${names_snapshot[${date_snapshot}]}"
+    done > "${path_note_names_snapshot}"
+
     local \
         target \
         i="${source_target_start}"
@@ -247,6 +260,8 @@ sync_source() {
         sync_target
         i=$(("$i" + 1))
     done
+
+    rm -f "${path_note_names_snapshot}"
 }
 
 work() {
