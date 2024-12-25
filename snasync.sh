@@ -361,7 +361,7 @@ cli() {
             shift
             ;;
         '--help')
-            echo 'snasyncer --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) ...'
+            echo "$0 --source [source] (--prefix [prefix]) --target [target] (--target [target] (--target [target])) ..."
             echo
             printf '  --%-37s%s\n' \
                 'source [source]' 'either the mountpoint containing .snapshots mountpoint, or .snapshots mountpoint itself, this begins the declaration of a single syncing operation, multiple [source] could be defined and each needs their corresponding [target]s (see below), e.g. "/.snapshots", "/home"' \
