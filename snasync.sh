@@ -29,6 +29,7 @@ initialize() {
     declare -gA targets_end
     wrapper_local='sudo'
     declare -gA wrappers_remote
+    declare -gA status_remote
 }
 
 check_options() {
@@ -155,11 +156,16 @@ sync_local_target() {
     done
 }
 
+get_args_remote() {
+    args_remote=(ssh -o ConnectTimeout=5 -o ConnectionAttempts=1 "${remote}" --)
+}
+
 sync_remote_target() {
     log "Syncing source ${path_source} to remote target ${target} at ${remote}..."
-    args_remote=(ssh -o ConnectTimeout=5 -o ConnectionAttempts=1 "${remote}" --)
+    declare -a args_remote
+    get_args_remote
     if ! "${args_remote[@]}" "test -d '${target}'"; then
-        echo "Skipped non-existing remote target ${target} at ${remote} or a bad remote"
+        log "Skipped non-existing remote target ${target} at ${remote} or a bad remote"
         continue
     fi
     local \
@@ -226,7 +232,19 @@ sync_target() {
         local \
             remote="${target%%:*}"
             target="${target#*:}"
-        sync_remote_target
+        case "${status_remote[${remote}]}" in
+        'good')
+            sync_remote_target
+            ;;
+        'bad')
+            log "Skipped syncing ${path_source} to target ${target} at"\
+                "${remote} as we failed to warm up it"
+            ;;
+        *)
+            log "Previous warmed up status for remote ${remote} is illegal"
+            return 1
+            ;;
+        esac
     fi
 }
 
@@ -273,8 +291,25 @@ sync_source() {
     rm -f "${path_note_names_snapshot}"
 }
 
+warm_up_remotes() {
+    local remote
+    declare -a args_remote
+    for remote in "${!wrappers_remote[@]}"; do
+        log "Warming up remote ${remote}..."
+        get_args_remote
+        if "${args_remote[@]}" 'exit'; then
+            status_remote["${remote}"]='good'
+            log "Warmed up remote ${remote}"
+        else
+            status_remote["${remote}"]='bad'
+            log "Failed to warm up remote ${remote}, would skip it when syncing"
+        fi
+    done
+}
+
 work() {
     systemd_pre
+    warm_up_remotes
     local \
         path_source \
         prefix_snapshot \
