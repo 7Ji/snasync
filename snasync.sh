@@ -157,7 +157,15 @@ sync_local_target() {
 }
 
 get_args_remote() {
-    args_remote=(ssh -o ConnectTimeout=5 -o ConnectionAttempts=1 "${remote}" --)
+    args_remote=(ssh 
+        -o ConnectTimeout=5 
+        -o ConnectionAttempts=1
+        -o Compression=no
+        -o Ciphers=aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+        -o ControlMaster=auto
+        -o ControlPersist=15
+        -o ControlPath=~/.ssh/sockets/socket@snasync-%r@%h:%p
+        "${remote}" --)
 }
 
 sync_remote_target() {
@@ -294,6 +302,7 @@ sync_source() {
 warm_up_remotes() {
     local remote
     declare -a args_remote
+    mkdir -p ~/.ssh/sockets
     for remote in "${!wrappers_remote[@]}"; do
         log "Warming up remote ${remote}..."
         get_args_remote

@@ -42,10 +42,6 @@ Due to the nature of warm/cold/remote backups that they could be unreachable in 
 
 It is highly recommended to sync multiple `[source]`s and multiple `[target]`s in a single snasync run, so pre- and post- logics would only be run once, and resources like remote SSH tunnels could be re-used efficiently (remember to set up your `ssh_config` to re-use connections, disbale compression, etc, following [Arch Wiki](https://wiki.archlinux.org/title/OpenSSH#Speeding_up_SSH))
 
-## In-and-out
-The way snasync creates its 
-
-
 ## License
 **snasync** (snapper snapshots syncer) is licensed under [**GPL3**](https://gnu.org/licenses/gpl.html)
  * Copyright (C) 2024-present Guoxin "7Ji" Pu (pugokushin@gmail.com)
