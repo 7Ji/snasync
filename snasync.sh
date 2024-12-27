@@ -269,6 +269,10 @@ sync_source() {
         path_source_container
 
     for path_source_snapshot in $("${wrapper_local}" find "${path_source}" -mindepth 2 -maxdepth 2 -type d -name snapshot); do
+        if [[ $("${wrapper_local}" btrfs property get "${path_source_snapshot}" ro) == 'ro=false' ]]; then
+            log "Skipping read-write snapshot ${path_source_snapshot}"
+            continue
+        fi
         path_source_container="${path_source_snapshot::-9}"
         path_source_info="${path_source_container}/info.xml"
         date_snapshot=$("${wrapper_local}" sed -n '/^  <date>/s/[^0-9]//gp' "${path_source_info}")
