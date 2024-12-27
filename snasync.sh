@@ -368,9 +368,25 @@ finish_source() {
 }
 
 path_source_from() {
+    if [[ "${1::1}" != '/' ]]; then
+        log "Source '$1' is not an absolute path"
+        return 1
+    fi
     path_source=$(echo "$1" | sed 's|/\+$||')
     if [[ "${path_source}" != */.snapshots ]]; then
         path_source+='/.snapshots'
+    fi
+}
+
+add_target() {
+    if [[ "${1::1}" != '/' ]] && [[ "${1#*:}" != /* ]]; then
+        log "Target '$1' is not an absolute local/remote path"
+        return 1
+    fi
+    targets+=("$1")
+    target_id=$(( "${target_id}" + 1 ))
+    if (( "${source_target_start}" < 0 )); then
+        source_target_start="${target_id}"
     fi
 }
 
@@ -397,11 +413,7 @@ cli() {
             shift
             ;;
         '--target')
-            targets+=("$2")
-            target_id=$(( "${target_id}" + 1 ))
-            if (( "${source_target_start}" < 0 )); then
-                source_target_start="${target_id}"
-            fi
+            add_target "$2"
             shift
             ;;
         '--help')
