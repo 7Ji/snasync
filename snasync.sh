@@ -124,7 +124,7 @@ sync_local_target() {
         if "${wrapper_local}" test -d "${path_target_container}"; then
             if "${wrapper_local}" test -d "${path_target_snapshot}"; then
                 uuid_received=$("${wrapper_local}" btrfs subvolume show "${path_target_snapshot}" | awk '/Received UUID/{print $3}')
-                if [[ "${#uuid_received}" == 36 ]]; then
+                if [[ "${#uuid_received}" == 36 ]] && [[ $("${wrapper_local}" btrfs property get "${path_target_snapshot}" ro) == 'ro=true' ]]; then
                     if [[ ! -f "${path_target_info}" ]]; then
                         "${wrapper_local}" cp --no-preserve=ownership "${path_source_info}" "${path_target_info}"
                     fi
@@ -198,7 +198,7 @@ sync_remote_target() {
         if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_container}'"; then
             if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_snapshot}'"; then
                 uuid_received=$("${args_remote[@]}" "${wrapper_remote} btrfs subvolume show '${path_target_snapshot}'" | awk '/Received UUID/{print $3}')
-                if [[ "${#uuid_received}" == 36 ]]; then
+                if [[ "${#uuid_received}" == 36 ]] && [[ $("${args_remote[@]}" "${wrapper_remote} btrfs property get '${path_target_snapshot}' ro") == 'ro=true' ]]; then
                     if [[ ! -f "${path_target_info}" ]]; then
                         "${wrapper_local}" cat "${path_source_info}" | 
                             "${args_remote[@]}" "${wrapper_remote} tee '${path_target_info}'" \
