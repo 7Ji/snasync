@@ -194,7 +194,7 @@ sync_remote_target() {
         path_source_container="${paths_source_container["${date_snapshot}"]}"
         path_source_snapshot="${path_source_container}/snapshot"
         path_source_info="${path_source_container}/info.xml"
-        log "Checking if it is needed to sync ${path_source_container} to ${path_target_container}..."
+        log "Checking if it is needed to sync ${path_source_container} to ${path_target_container} at ${remote}..."
         if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_container}'"; then
             if "${args_remote[@]}" "${wrapper_remote} test -d '${path_target_snapshot}'"; then
                 uuid_received=$("${args_remote[@]}" "${wrapper_remote} btrfs subvolume show '${path_target_snapshot}'" | awk '/Received UUID/{print $3}')
