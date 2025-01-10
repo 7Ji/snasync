@@ -1,0 +1,9 @@
+[Unit]
+Description=Snasync backup
+After=network-online.target
+Wants=network-online.target nss-lookup.target
+
+[Service]
+Type=simple
+User=snasync
+ExecStart=/usr/bin/snasync $SNASYNC_ARGS
