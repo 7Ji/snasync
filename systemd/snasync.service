@@ -6,4 +6,5 @@ Wants=network-online.target nss-lookup.target
 [Service]
 Type=simple
 User=snasync
+EnvironmentFile=/etc/conf.d/snasync
 ExecStart=/usr/bin/snasync $SNASYNC_ARGS
