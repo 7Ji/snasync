@@ -174,7 +174,7 @@ sync_remote_target() {
     get_args_remote
     if ! "${args_remote[@]}" "test -d '${target}'"; then
         log "Skipped non-existing remote target ${target} at ${remote} or a bad remote"
-        continue
+        return 1
     fi
     local \
         args_parent=() \
