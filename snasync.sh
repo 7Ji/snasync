@@ -275,7 +275,7 @@ sync_source() {
         fi
         path_source_container="${path_source_snapshot::-9}"
         path_source_info="${path_source_container}/info.xml"
-        date_snapshot=$("${wrapper_local}" sed -n '/^  <date>/s/[^0-9]//gp' "${path_source_info}")
+        date_snapshot=$("${wrapper_local}" cat "${path_source_info}" | sed -n '/^  <date>/s/[^0-9]//gp')
         dates_snapshot+=("${date_snapshot}")
         paths_source_container[${date_snapshot}]="${path_source_container}"
         names_snapshot[${date_snapshot}]="${prefix_snapshot}-${date_snapshot}"
