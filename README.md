@@ -42,6 +42,36 @@ Due to the nature of warm/cold/remote backups that they could be unreachable in 
 
 It is highly recommended to sync multiple `[source]`s and multiple `[target]`s in a single snasync run, so pre- and post- logics would only be run once, and resources like remote SSH tunnels could be re-used efficiently (remember to set up your `ssh_config` to re-use connections, disbale compression, etc, following [Arch Wiki](https://wiki.archlinux.org/title/OpenSSH#Speeding_up_SSH))
 
+## Site-to-site syncing
+
+A dedicated script `site-to-site.sh` is provided for site-to-site syncing (i.e. from server A with snasync Btrfs snapshots storage, to server B with snasync Btrfs snapshots storage), which, in most cases happens offline and does not require the inter-storage to be Btrfs-based.
+
+The logic goes like the following:
+- At site A, clients run snasync routinely to sync to server A (e.g. to its `/srv/backup/snapshots`)
+- At site A, on server A with snasync Btrfs snapshots storage, mount an external drive formatted with any FS, and run `site-to-site.sh send` with needed arguments, the snapshots (in their raw Btrfs send-receive format) would be "archived" onto the external drive. Umount that after syncing.
+- Carry the external drive to site B
+- At site B, on server B with snasync Btrfs snapshots storage, mount that external drive, and run `site-to-site.sh receive` with needed arguments, the snapshots (in their raw Btrfs send-receive format) would be "restored" into its snasync Btrfs snapshots storage.
+
+As a side effect this can also be used for cold backup if you skip the steps for site B or even for recovery if server A = server B. But do not rely on this as the raw Btrfs send-receive format might change and your offline "backup" would in most cases become useless.
+
+My recommendation is to do this with a longer interval, 2 more orders of magnitude than how often you do snasync at the same site. (E.g. if your clients sync nightly to a in-site backup server, do site-to-site sync monthly).
+
+The command-line usage is pretty simple:
+```
+site-to-site.sh [send/receive] [source path] [target path]
+```
+Note the following requirements:
+- On `send`, the `[source path]` must be the snasync Btrfs snapshots storage, storing those `[name]-[timestamp]` folders each storing `info.xml` and `snapshot`. The `[target path]` can be any FS.
+- On `receive`, the `[target path]` must reside on a Btrfs filesystem and runinng `btrfs receive` there should be allowed. The `[source path]` can be any FS, as long as it stores the previously sent "snapshots".
+- Both `send` and `receive` commands shall be run on exactly the server with snasync storage.
+
+Optionally the following arguments can be specified for `send`:
+```
+--with [snasync container name] (--with [snasync contaainer name])
+```
+If that is given, the site-to-site syncer would consider the specified container  (and any container older than it) already exists at the receiver end, and use it as the parent, and only send containers newer than it.
+
+
 ## License
 **snasync** (snapper snapshots syncer) is licensed under [**GPL3**](https://gnu.org/licenses/gpl.html)
  * Copyright (C) 2024-present Guoxin "7Ji" Pu (pugokushin@gmail.com)
