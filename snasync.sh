@@ -217,7 +217,7 @@ sync_remote_target() {
         fi
         if [[ "${should_sync}" ]]; then
             log "Syncing ${path_source_container} to ${path_target_container} at ${remote} (args parent: ${args_parent[*]})..."
-            "${wrapper_local}" btrfs send --compressed-data "${args_parent[@]}" -- "${path_source_snapshot}" | "${args_remote[@]}" "${wrapper_local} btrfs receive --force-decompress -- '${path_target_container}'"
+            "${wrapper_local}" btrfs send --compressed-data "${args_parent[@]}" -- "${path_source_snapshot}" | "${args_remote[@]}" "${wrapper_remote} btrfs receive --force-decompress -- '${path_target_container}'"
             "${wrapper_local}" cat "${path_source_info}" | 
                 "${args_remote[@]}" "${wrapper_remote} tee '${path_target_info}'" \
                 > /dev/null
